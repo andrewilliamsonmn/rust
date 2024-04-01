@@ -1,0 +1,49 @@
+use tokio::net::TcpListener;
+use tokio::stream::StreamExt;
+use tungstenite::protocol::Message;
+use tungstenite::server::accept;
+
+#[tokio::main]
+async fn main() {
+    // Start TCP listener
+    let addr = "127.0.0.1:8080";
+    let listener = TcpListener::bind(addr).await.expect("Failed to bind TCP listener");
+
+    println!("WebSocket server running on {}", addr);
+
+    // Accept incoming connections
+    while let Ok((stream, _)) = listener.accept().await {
+        // Spawn a new task for each incoming connection
+        tokio::spawn(handle_connection(stream));
+    }
+}
+
+async fn handle_connection(stream: tokio::net::TcpStream) {
+    // Convert TCP stream to WebSocket handshake
+    let ws_stream = accept(stream)
+        .await
+        .expect("Error during WebSocket handshake");
+
+    println!("WebSocket connection established");
+
+    // Split the WebSocket into sender and receiver
+    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+
+    // Echo messages back to the client
+    while let Some(Ok(msg)) = ws_receiver.next().await {
+        if msg.is_text() || msg.is_binary() {
+            let response = match msg {
+                Message::Text(text) => Message::Text(text),
+                Message::Binary(bin) => Message::Binary(bin),
+                _ => continue,
+            };
+
+            if let Err(err) = ws_sender.send(response).await {
+                eprintln!("Failed to send message: {:?}", err);
+                return;
+            }
+        }
+    }
+
+    println!("WebSocket connection closed");
+}
