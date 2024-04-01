@@ -1,0 +1,30 @@
+use scraper::{Html, Selector};
+use reqwest::blocking::get;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // URL to scrape
+    let url = "https://example.com";
+
+    // Send GET request to the URL
+    let response = get(url)?;
+    let body = response.text()?;
+    
+    // Parse the HTML body
+    let document = Html::parse_document(&body);
+
+    // Define a CSS selector to target the article titles and URLs
+    let title_selector = Selector::parse("h2").unwrap();
+    let link_selector = Selector::parse("a").unwrap();
+
+    // Extract and print the titles and URLs
+    for title in document.select(&title_selector) {
+        let link = title.select(&link_selector).next().unwrap();
+        let title_text = title.text().collect::<Vec<_>>().join("");
+        let url = link.value().attr("href").unwrap_or("");
+
+        println!("Title: {}", title_text.trim());
+        println!("URL: {}\n", url);
+    }
+
+    Ok(())
+}
